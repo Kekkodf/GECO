@@ -3,7 +3,7 @@
 <!-- BANNER / LOGO -->
 <img src="./img/GECO_LowResolution.png" alt="Project Banner" width="100%"/>
 
-<h2>GECO: Generating Contextually Obfuscated Text with Differential Privacy </h2>
+<h2>GECO: Generating Contextually Obfuscated Texts with Differential Privacy </h2>
 <h4>⚡ Providing Contextual Privacy to plain texts using Differential Privacy and Generative AI ⚡</h4>
 
 <!-- BADGES -->
