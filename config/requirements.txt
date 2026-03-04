@@ -1,0 +1,13 @@
+numpy
+pandas
+matplotlib
+seaborn
+tqdm
+ir-measures
+ir-datasets
+torch
+pingouin
+faiss_cpu
+vec2text
+logging
+transformers==4.49.0
