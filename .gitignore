@@ -211,3 +211,4 @@ test/
 vec2text_demo_ckpt/
 models/
 *.pt
+.vscode/
