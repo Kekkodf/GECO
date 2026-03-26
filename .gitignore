@@ -208,6 +208,6 @@ __marimo__/
 
 # Personal
 test/
-data/
 vec2text_demo_ckpt/
 models/
+*.pt
