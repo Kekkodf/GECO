@@ -2,7 +2,7 @@
 import logging
 import os
 
-def create(name:str = 'mylogger') -> logging.Logger:
+def createLogger(name:str = 'mylogger') -> logging.Logger:
     """
     Create a logger with the specified name and set it up to log to a file. Formatter '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 
@@ -36,7 +36,7 @@ def create(name:str = 'mylogger') -> logging.Logger:
 
         logger.addHandler(fh)
 
-        logger.info('Logger successfully created')
+        logger.info('Logger successfully created.')
         return logger
     except Exception as e:
         print(f'Error creating logger: {e}')
