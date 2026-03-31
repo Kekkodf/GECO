@@ -75,7 +75,9 @@ class Obfuscator:
         self.collection_name = collection_name
         self.cache_path_pins = cache_path_pins
         self.top_percentile = kwargs.get("top_percentile", 0.001)
+        assert 0.0 < self.top_percentile <= 1.0, "top_percentile must be in the range (0.0, 1.0]"
         self.encode_batch_size = kwargs.get("encode_batch_size", 512)
+        assert self.encode_batch_size > 0, "encode_batch_size must be a positive integer"
         queries = self._load_pool()
         self.queries, self.embeddings = self._load_or_build_pool_embeddings(queries)
 
@@ -83,7 +85,10 @@ class Obfuscator:
         self.utility_function = None #to be defined in the specific implementations of GECO (e.g. CosineGECO, KernelDensityGECO, CorrelationGECO)
         self.global_sensitivity = None #to be defined in the specific implementations of GECO (e.g. CosineGECO, KernelDensityGECO, CorrelationGECO)
         self.epsilons = epsilons
+        assert all(epsilon > 0 for epsilon in self.epsilons), "All epsilon values must be strictly positive"
         self.log.info(f"Epsilon values for obfuscation: {self.epsilons}")
+
+        self.additional_kwargs = kwargs
 
     def __str__(self):
         return f"GECO Obfuscator (Abstract) with st_model={self.st_model_name}, inversion_model={self.inversion_model_name}, corrector_model={self.corrector_model_name}, top_percentile={self.top_percentile}, n_corpus={self.n_pool}, epsilons={self.epsilons}.\n WARNING: No utility function specified, this is an abstract class. Please use a specific implementation of GECO with a defined utility function (e.g. CosineGECO, KernelDensityGECO, CorrelationGECO) for actual obfuscation."
