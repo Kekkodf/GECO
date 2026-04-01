@@ -1,5 +1,7 @@
-from geco.src import AbstractGECO
 from tabulate import tabulate
+
+from geco.src import AbstractGECO
+
 
 class CosineGECO(AbstractGECO.Obfuscator):
     """Cosine similarity based GECO obfuscator.

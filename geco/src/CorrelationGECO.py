@@ -1,5 +1,7 @@
-from geco.src import AbstractGECO
 from tabulate import tabulate
+
+from geco.src import AbstractGECO
+
 
 class CorrelationGECO(AbstractGECO.Obfuscator):
     """

@@ -2,6 +2,7 @@
 import logging
 import os
 
+
 def createLogger(name:str = 'mylogger') -> logging.Logger:
     """
     Create a logger with the specified name and set it up to log to a file. Formatter '%(asctime)s - %(name)s - %(levelname)s - %(message)s'

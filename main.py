@@ -1,9 +1,8 @@
 import geco.utils
-
 from geco.src.AbstractGECO import Obfuscator
-from geco.src.KernelDensityGECO import KernelDensityGECO
-from geco.src.CosineGECO import CosineGECO
 from geco.src.CorrelationGECO import CorrelationGECO
+from geco.src.CosineGECO import CosineGECO
+from geco.src.KernelDensityGECO import KernelDensityGECO
 
 DEMO_TEXTS = [
     "do goldfish grow",

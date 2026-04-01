@@ -1,14 +1,14 @@
-import torch
-import numpy as np
-import pandas as pd
 import logging
-import vec2text
-import transformers
-
 from pathlib import Path
 from typing import List, Optional, Tuple
+
+import numpy as np
+import pandas as pd
+import torch
+import transformers
+import vec2text
 from sentence_transformers import SentenceTransformer
-from tabulate import tabulate    
+from tabulate import tabulate
 
 torch._logging.set_logs(dynamo=logging.WARNING)
 
