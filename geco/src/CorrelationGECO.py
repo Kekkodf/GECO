@@ -1,4 +1,5 @@
 from geco.src import AbstractGECO
+from tabulate import tabulate
 
 class CorrelationGECO(AbstractGECO.Obfuscator):
     """
@@ -46,7 +47,32 @@ class CorrelationGECO(AbstractGECO.Obfuscator):
         self.log.info(f"CorrelationGECO Obfuscator initialized with utility function: {self.utility_function} and global sensitivity: {self.global_sensitivity}.")
 
     def __str__(self):
-        return f"CorrelationGECO Obfuscator with st_model={self.st_model_name}, inversion_model={self.inversion_model_name}, corrector_model={self.corrector_model_name}, top_percentile={self.top_percentile}, n_corpus={self.n_pool}, epsilon_values={self.epsilons}, utility_function={self.utility_function}, global_sensitivity={self.global_sensitivity}."
-    
+        COL1, COL2 = 22, 60
+        def row(label, value):
+            return [f"{label:<{COL1}}", f"{str(value):<{COL2}}"]
+
+        model_section: str = tabulate(
+            [
+                row("📡  Logger",          self.log.handlers[0].baseFilename),
+                row("🧠  Sentence Model",  self.st_model_name),
+                row("🔁  Inversion Model", self.inversion_model_name),
+                row("🔧  Corrector Model", self.corrector_model_name),
+                row("📊  Top Percentile",  self.top_percentile),
+                row("📂  Collection Pool", self.collection_name),
+                row("🎱  Pool Size",       self.n_pool),
+                row("🔑  Epsilons",        self.epsilons),
+                row("📐  Utility Function",    self.utility_function),
+                row("📏  Global Sensitivity",  self.global_sensitivity)
+            ],
+            headers=[f"{'Parameter':<{COL1}}", f"{'Value':<{COL2}}"],
+            tablefmt="rounded_outline",
+        )
+
+
+        return "\n".join([
+            "🔒  GECO Obfuscator  (CorrelationGECO)\n",
+            model_section
+        ])
+
     def _compute_utility(self, query_embedding, pool_embeddings):
         ...

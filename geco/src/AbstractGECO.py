@@ -8,6 +8,7 @@ import transformers
 from pathlib import Path
 from typing import List, Optional, Tuple
 from sentence_transformers import SentenceTransformer
+from tabulate import tabulate    
 
 torch._logging.set_logs(dynamo=logging.WARNING)
 
@@ -89,8 +90,37 @@ class Obfuscator:
         self.additional_kwargs = kwargs
 
     def __str__(self):
-        return f"GECO Obfuscator (Abstract) with st_model={self.st_model_name}, inversion_model={self.inversion_model_name}, corrector_model={self.corrector_model_name}, top_percentile={self.top_percentile}, n_pool={self.n_pool}, epsilons={self.epsilons}.\n WARNING: No utility function specified, this is an abstract class. Please use a specific implementation of GECO with a defined utility function (e.g. CosineGECO, KernelDensityGECO, CorrelationGECO) for actual obfuscation."
-    
+        COL1, COL2 = 22, 60
+        def row(label, value):
+            return [f"{label:<{COL1}}", f"{str(value):<{COL2}}"]
+
+        model_section: str = tabulate(
+            [
+                row("📡  Logger", self.log.handlers[0].baseFilename),
+                row("🧠  Sentence Model",  self.st_model_name),
+                row("🔄  Inversion Model", self.inversion_model_name),
+                row("🔧  Corrector Model",  self.corrector_model_name),
+                row("📊  Top Percentile",  self.top_percentile),
+                row("📂  Collection Pool", self.collection_name),
+                row("🎱  Pool Size",       self.n_pool),
+                row("🔑  Epsilons",        self.epsilons),
+            ],
+            headers=[f"{'Parameter':<{COL1}}", f"{'Value':<{COL2}}"],
+            tablefmt="rounded_outline",
+        )
+
+        warning: str = tabulate(
+            [[f"{'Abstract class — no utility function defined.':<{COL1 + COL2}}"],
+             [f"{'Use a concrete subclass: CosineGECO | KernelDensityGECO | CorrelationGECO':<{COL1 + COL2}}"]],
+            tablefmt="double_grid",
+        )
+
+        return "\n".join([
+            "🔒  GECO Obfuscator  (Abstract Base)\n",
+            model_section,
+            warning,
+        ])
+
     def _load_models(self) -> None:
         """
         Method to load all required models (embedder and generator) for the obfuscation mechanism. This method is called during the initialization of the GECO class to ensure that all models are loaded and ready for use when obfuscating texts.
@@ -280,7 +310,7 @@ class Obfuscator:
         if not check:
             self.log.error("Utility function and global sensitivity must be defined for the obfuscation to work. Please use a specific implementation of GECO with a defined utility function and global sensitivity (e.g. CosineGECO, KernelDensityGECO, CorrelationGECO) for actual obfuscation.")
             raise ValueError("Utility function and global sensitivity must be defined for the obfuscation to work. Please use a specific implementation of GECO with a defined utility function and global sensitivity (e.g. CosineGECO, KernelDensityGECO, CorrelationGECO) for actual obfuscation.")
-        selected_query, selected_emb, probs, utilities = self.exponential_mechanism(e, epsilon, seed=seed)
+        selected_query, selected_emb, probs, utilities = self.exponential_mechanism(e, epsilon, seed=seed) # TODO: check logic of the return values of exponential_mechanism
 
         # Generation of the output text
         self.log.info(f"Pin query selected by the exponential mechanism: '{selected_query}'")
@@ -310,10 +340,9 @@ class Obfuscator:
         top_candidates = [
             (self.queries[fidx[i]], float(probs[i]), float(utilities[i]))
             for i in top_local
-        ]
+        ] #TODO: check LOGIC
 
-        return (output_text, selected_query, cos_io, cos_iq, angle, top_candidates
-        )
+        return (output_text, selected_query, cos_io, cos_iq, angle, top_candidates)
 
     def batch_obfuscate(self, 
                         texts: List[str], 
@@ -386,8 +415,8 @@ class Obfuscator:
         filtered_idx = np.where(mask)[0]
         utilities = all_utils[filtered_idx]
         K = len(filtered_idx)
-        self.log.info(f"Using top_percentile {self.top_percentile:.2f}, meaning {K:,}/{N:,} candidates.")
-        self.log.info(f"(u in [{utilities.min():.4f}, {utilities.max():.4f}])")
+        self.log.info(f"Using top_percentile {self.top_percentile:.3f}, meaning {K:,}/{N:,} candidates.")
+        self.log.info(f"(u in [{utilities.min():.3f}, {utilities.max():.3f}])")
 
         # Gumbel-max trick (equivalent to sampling from Exp Mech distribution)
         # ref. https://differentialprivacy.org/one-shot-top-k/

@@ -11,3 +11,4 @@ faiss_cpu
 vec2text
 logging
 transformers==4.49.0
+tabulate
