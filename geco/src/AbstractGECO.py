@@ -1,4 +1,3 @@
-import geco.src.helpers as helpers
 import torch
 import numpy as np
 import pandas as pd
@@ -26,8 +25,7 @@ class Obfuscator:
     The GECO class provides methods for obfuscating a single text or a batch of texts, and it also includes diagnostics such as cosine similarity between the input and output embeddings, and the top candidates from the exponential mechanism.
     """
 
-    def __init__(
-        self,
+    def __init__(self,
         log: logging.Logger,
         st_model_name: str,
         inversion_model_name: str,
@@ -91,7 +89,7 @@ class Obfuscator:
         self.additional_kwargs = kwargs
 
     def __str__(self):
-        return f"GECO Obfuscator (Abstract) with st_model={self.st_model_name}, inversion_model={self.inversion_model_name}, corrector_model={self.corrector_model_name}, top_percentile={self.top_percentile}, n_corpus={self.n_pool}, epsilons={self.epsilons}.\n WARNING: No utility function specified, this is an abstract class. Please use a specific implementation of GECO with a defined utility function (e.g. CosineGECO, KernelDensityGECO, CorrelationGECO) for actual obfuscation."
+        return f"GECO Obfuscator (Abstract) with st_model={self.st_model_name}, inversion_model={self.inversion_model_name}, corrector_model={self.corrector_model_name}, top_percentile={self.top_percentile}, n_pool={self.n_pool}, epsilons={self.epsilons}.\n WARNING: No utility function specified, this is an abstract class. Please use a specific implementation of GECO with a defined utility function (e.g. CosineGECO, KernelDensityGECO, CorrelationGECO) for actual obfuscation."
     
     def _load_models(self) -> None:
         """
@@ -149,7 +147,8 @@ class Obfuscator:
         self.log.info(f"Loaded {len(queries):,} queries.")
         return queries
 
-    def _load_or_build_pool_embeddings(self, queries: List[str]) -> Tuple[List[str], torch.Tensor]:
+    def _load_or_build_pool_embeddings(self, 
+                                       queries: List[str]) -> Tuple[List[str], torch.Tensor]:
         """
         Load or build embeddings for the query pool. This method checks if a cache file exists at the specified path and if it contains embeddings for the same number of queries as the loaded pool. If the cache is valid, it loads the queries and their corresponding embeddings from the cache. If the cache is not valid (e.g., it does not exist or has a size mismatch), it encodes the queries using the sentence transformer model to generate their embeddings, saves them to the cache for future use, and returns the queries along with their embeddings.
         """
@@ -175,25 +174,30 @@ class Obfuscator:
         self.log.info(f"Cache saved to {self.cache_path_pins}.")
         return queries, embeddings
     
-    def check_utility_function(self) -> None:
+    def check_utility_function(self) -> bool:
         """
         Check Utility Function for debugging and repro. This function logs the Utiltiy function.
         """
         if self.utility_function is None:
             self.log.warning("Utility function is not defined. This is an abstract GECO obfuscator. Please use a specific implementation of GECO with a defined utility function (e.g. CosineGECO, KernelDensityGECO, CorrelationGECO) for actual obfuscation.")
+            return False
         else:
             self.log.info(f"Using utility function: {self.utility_function}.")
+            return True
 
-    def check_global_sensitivity(self) -> None:
+    def check_global_sensitivity(self) -> bool:
         """
         Check Global Sensitivity for debugging and repro. This function logs the Global Sensitivity.
         """
         if self.global_sensitivity is None:
             self.log.warning("Global sensitivity is not defined. This is an abstract GECO obfuscator. Please use a specific implementation of GECO with a defined global sensitivity (e.g. CosineGECO, KernelDensityGECO, CorrelationGECO) for actual obfuscation.")
+            return False
         else:
             self.log.info(f"Global Sensitivity: {self.global_sensitivity}.")
+            return True
 
-    def set_utility_function(self, utility_function: str) -> None:
+    def set_utility_function(self, 
+                             utility_function: str) -> None:
         """
         Set the utility function for the GECO obfuscator. This function allows to set the utility function for the obfuscator, which will be used in the exponential mechanism to select a query from the pool based on its utility with respect to the input embedding. The utility function should be defined in the specific implementations of GECO (e.g. CosineGECO, KernelDensityGECO, CorrelationGECO) and should be compatible with the way the utility is computed in those implementations.
 
@@ -203,7 +207,8 @@ class Obfuscator:
         self.utility_function = utility_function
         self.log.info(f"Utility function set to: {self.utility_function}.")
 
-    def set_global_sensitivity(self, global_sensitivity: float) -> None:
+    def set_global_sensitivity(self, 
+                               global_sensitivity: float) -> None:
         """
         Set the global sensitivity for the GECO obfuscator. This function allows to set the global sensitivity for the obfuscator, which is a parameter used in the exponential mechanism to determine how much noise to add when selecting a query from the pool based on its utility. The global sensitivity should be defined in the specific implementations of GECO (e.g. CosineGECO, KernelDensityGECO, CorrelationGECO) and should be compatible with the way the utility is computed in those implementations.
 
@@ -213,69 +218,88 @@ class Obfuscator:
         self.global_sensitivity = global_sensitivity
         self.log.info(f"Global sensitivity set to: {self.global_sensitivity}.")
 
-    def obfuscate(
-        self,
-        log: logging.Logger,
-        text: str,
-        epsilon: float,
-        seed: Optional[int] = None,
-        top_k_report: int = 5,
-    ) -> Tuple[str, str, float, float, float, List[Tuple[str, float, float]]]:
+    def embed(self, 
+              texts: List[str]) -> torch.Tensor:
         """
-        Obfuscate a single input text using the GECO mechanism.
+        Embed a list of texts using the sentence transformer model.
 
-        :param log: logger to use for logging the obfuscation process.
-        :type log: logging.Logger
+        :param texts: a list of input texts to embed.
+        :type texts: List[str]
+
+        :return: a tensor containing the embeddings of the input texts, shape (len(texts), embedding_dim).
+        :rtype: torch.Tensor
+        """
+        with torch.no_grad():
+            embeddings = self.st_model.encode(
+                sentences=texts,
+                batch_size=self.encode_batch_size,
+                convert_to_tensor=True,
+                normalize_embeddings=True,
+                show_progress_bar=False,
+            )
+        return embeddings.float()
+
+    def obfuscate(self,
+                  text: str,
+                  epsilon: float,
+                  seed: Optional[int] = None,
+                  top_k_report: int = 5) -> Tuple[str, str, float, float, float, List[Tuple[str, float, float]]]:
+        """
+        Obfuscate a single input text using the GECO mechanism. This method takes an input text, encodes it into an embedding, uses the exponential mechanism to select a query from the pool based on the utility function, reconstructs a new text from the embedding of the selected query using the corrector model, and returns the obfuscated text along with diagnostics such as cosine similarity between the input and output embeddings, and the top candidates from the exponential mechanism.
+
         :param text: the input text to obfuscate.
         :type text: str
-        :param epsilon: the privacy budget for the exponential mechanism.
+        :param epsilon: the privacy budget to use for the exponential mechanism when selecting a query from the pool. This value determines the level of privacy provided by the obfuscation, with smaller values providing stronger privacy guarantees but potentially lower utility of the obfuscated text.
         :type epsilon: float
-        :param seed: random seed for reproducibility. Defaults to None.
-        :type seed: Optional[int], optional
-        :param top_k_report: the number of top candidates to report from the exponential mechanism for diagnostics. Defaults to 5.
+        :param seed: an optional random seed for reproducibility. This seed will be used in the exponential mechanism to ensure that the selection of the query from the pool is reproducible across runs with the same input and parameters. If None, the selection will be non-deterministic.
+        :type seed: Optional[int]
+        :param top_k_report: the number of top candidates to report from the exponential mechanism for diagnostics. This determines how many of the top candidates (queries) from the exponential mechanism will be included in the output for diagnostic purposes, along with their probabilities and utilities. Defaults to 5.
         :type top_k_report: int, optional
 
-        :return: a tuple containing the obfuscated text, the selected query, the cosine similarity between the input and output embeddings, the cosine similarity between the input embedding and the selected query embedding, the angle between the input and output embeddings in degrees, and a list of the top candidates from the exponential mechanism with their probabilities and utilities.
+        :return: a tuple containing the obfuscated text, the selected query, the cosine similarity between the input and output embeddings, the cosine similarity between the input embedding and the selected query embedding, the angle (in degrees) between the input and output embeddings, and a list of the top candidates from the exponential mechanism with their probabilities and utilities.
         :rtype: Tuple[str, str, float, float, float, List[Tuple[str, float, float]]]
 
-        Example usage:
-        >>> log = create('mylogger')
-        >>> st_model, corrector = load_gtr_corrector(log)
-        >>> obfuscator = GECO(log, st_model, corrector)
-        >>> text = "This is a test sentence to obfuscate."
-        >>> epsilon = 1.0
-        >>> obfuscated_text, selected_query, cos_io, cos_iq, angle, top_candidates = obfuscator.obfuscate(log, text, epsilon)
-        """
-        log.info(f"[obfuscate] eps={epsilon:.2f} t={self.top_percentile:.2f} "
-                 f"text='{text[:60]}'")
+        The returned tuple contains the following elements:
+        - obfuscated_text: the generated obfuscated text from the GECO mechanism.
+        - selected_query: the query from the pool that was selected by the exponential mechanism as the pin for reconstruction.
+        - cos_io: the cosine similarity between the input embedding and the output embedding, which provides a measure of how similar the obfuscated text is to the original text in the embedding space.
+        - cos_iq: the cosine similarity between the input embedding and the selected query embedding, which provides a measure of how similar the selected query is to the original text in the embedding space.
+        - angle: the angle in degrees between the input embedding and the output embedding, which provides another measure of similarity between the original and obfuscated texts in the embedding space (smaller angles indicate more similar embeddings).
+        - top_candidates: a list of the top candidates from the exponential mechanism, where each candidate is a tuple containing the query string, its probability of selection, and its utility value. This list provides insight into which queries were considered most relevant by the exponential mechanism and how they compare in terms of utility and selection probability.          
 
+        Example usage:
+        >>> obfuscator = GECOObfuscator(log=logger, st_model_name="all-MiniLM-L6-v2", inversion_model_name="inversion-model", corrector_model_name="corrector-model", cache_path_pins="cache/pins.pt")
+        >>> obfuscated_text, selected_query, cos_io, cos_iq, angle, top_candidates = obfuscator.obfuscate("This is a sensitive text that needs to be obfuscated.", epsilon=10.0, seed=42, top_k_report=5)
+        """
+        self.log.info(f"Obfuscating text: '{text}' with epsilon={epsilon}.")
         # encoding input text
-        e = helpers.embed(self.log, self.st_model, [text])[0]
+        e = self.embed([text])[0]
 
         # exponential mechanism to select the pin
-        selected_query, selected_emb, probs, utilities = exponential_mechanism(
-            self.log, e, self.corpus_embs, self.corpus_queries, epsilon,
-            top_percentile=self.top_percentile, delta_u=2.0, seed=seed,
-        )
+        check = self.check_utility_function() and self.check_global_sensitivity()
+        if not check:
+            self.log.error("Utility function and global sensitivity must be defined for the obfuscation to work. Please use a specific implementation of GECO with a defined utility function and global sensitivity (e.g. CosineGECO, KernelDensityGECO, CorrelationGECO) for actual obfuscation.")
+            raise ValueError("Utility function and global sensitivity must be defined for the obfuscation to work. Please use a specific implementation of GECO with a defined utility function and global sensitivity (e.g. CosineGECO, KernelDensityGECO, CorrelationGECO) for actual obfuscation.")
+        selected_query, selected_emb, probs, utilities = self.exponential_mechanism(e, epsilon, seed=seed)
 
         # Generation of the output text
-        log.info(f"[reconstruct pivot] q*: '{selected_query[:60]}'")
-        output_text = generate_from_embedding(selected_emb, self.corrector)
-        log.info(f"[reconstruct output] '{output_text}'")
+        self.log.info(f"Pin query selected by the exponential mechanism: '{selected_query}'")
+        output_text = self.generate_from_embedding(selected_emb)
+        self.log.info(f"Generated obfuscated text: '{output_text}'")
 
         # Diagnostics
-        out_emb = helpers.embed(self.log, self.st_model, [output_text])[0]
+        out_emb = self.embed([output_text])[0]
         cos_io  = float((e.cpu() @ out_emb.cpu()).item())
         cos_iq  = float((e.cpu() @ selected_emb.cpu()).item())
         angle   = float(np.degrees(np.arccos(np.clip(cos_io, -1.0, 1.0))))
 
         # Rebuild filtered_idx for the top-k report
         e_cpu = (e / e.norm()).cpu()
-        chunk = 50_000; N = self.n_corpus
+        chunk = 50_000; N = self.n_pool
         all_utils = np.empty(N, dtype=np.float32)
         for s in range(0, N, chunk):
             ee = min(s + chunk, N)
-            all_utils[s:ee] = (self.corpus_embs[s:ee] @ e_cpu).numpy()
+            all_utils[s:ee] = (self.embeddings[s:ee] @ e_cpu).numpy()
         if self.top_percentile < 1.0:
             cut = float(np.percentile(all_utils, 100.0 * (1.0 - self.top_percentile)))
             fidx = np.where(all_utils >= cut)[0]
@@ -284,122 +308,97 @@ class Obfuscator:
 
         top_local = np.argsort(probs)[::-1][:top_k_report]
         top_candidates = [
-            (self.corpus_queries[fidx[i]], float(probs[i]), float(utilities[i]))
+            (self.queries[fidx[i]], float(probs[i]), float(utilities[i]))
             for i in top_local
         ]
 
         return (output_text, selected_query, cos_io, cos_iq, angle, top_candidates
         )
 
-    def batch_obfuscate(self, texts: List[str], epsilon: float,
+    def batch_obfuscate(self, 
+                        texts: List[str], 
+                        epsilon: float, 
                         seed: Optional[int] = None) -> List[Tuple[str, str, float, float, float, List[Tuple[str, float, float]]]]:
         return [self.obfuscate(t, epsilon, seed=seed) for t in texts]
     
+    def generate_from_embedding(self,
+                                target_emb: torch.Tensor,
+                                num_corrector_steps: int = 1) -> str:
+        """
+        Last part of the GECO mechanism: generation of the obfuscated text from the embedding of the selected query using the corrector model. This method takes the target embedding (the embedding of the selected query) and uses the vec2text corrector model to generate a new text that corresponds to that embedding. The generation process can be configured with the number of steps to use in the corrector model, which can affect the quality and diversity of the generated text. The method returns the generated obfuscated text as a string.   
 
-@staticmethod
-def exponential_mechanism(
-        log: torch.Tensor,
-        e: torch.Tensor,
-        pool_embs: torch.Tensor,
-        pool_queries: List[str],
-        epsilon: float,
-        top_percentile: float = 0.1,
-        utility_function: str = "cosine_similarity",
-        seed: Optional[int] = None,
-        **kwargs) -> Tuple[str, torch.Tensor, np.ndarray, np.ndarray]:
-    """
-    Implemenmts the exponential mechanism for selecting a query from the queries pool
+        :param target_emb: the embedding of the selected query from the exponential mechanism, which will be used as the target for generation. This embedding should be a tensor of shape (embedding_dim,) and should be compatible with the corrector model's expected input.
+        :type target_emb: torch.Tensor
+        :param num_corrector_steps: the number of steps to use in the corrector model for generating the obfuscated text. This parameter can affect the quality and diversity of the generated text, with more steps potentially leading to better generation at the cost of increased computation time. Defaults to 1.
+        :type num_corrector_steps: int, optional
 
+        :return: the generated obfuscated text corresponding to the target embedding.
+        :rtype: str
+        """
+        device = next(self.corrector.model.parameters()).device
+        with torch.no_grad():
+            texts = vec2text.invert_embeddings(
+                embeddings=target_emb.unsqueeze(0).to(device),
+                corrector=self.corrector,
+                num_steps=num_corrector_steps,
+            )
+        return texts[0].strip()
     
-    Args:
-        log (logging.Logger): logger to use for logging the process.
-        e (torch.Tensor): the embedding of the input text, shape (d,).
-        pool_embs (torch.Tensor): the embeddings of the queries pool, shape (N, d).
-        pool_queries (List[str]): the list of queries in the pool, length N.
-        epsilon (float): the privacy budget for the exponential mechanism.
-        top_percentile (float, optional): the percentile threshold for filtering candidates based on utility. Defaults to 0.1 (i.e., top 10%).
-        utility_function (str, optional): the utility function to use. Defaults to "cosine_similarity".
-        seed (Optional[int], optional): random seed for reproducibility. Defaults to None.
+    def exponential_mechanism(self,
+                              e: torch.Tensor,
+                              epsilon: float,
+                              seed: Optional[int] = None) -> Tuple[str, torch.Tensor, np.ndarray, np.ndarray]:
+        """
+        Exponential mechanism to select a query from the pool based on the utility function. This method computes the utility of each query in the pool with respect to the input embedding, applies a percentile filter to keep only the top candidates, and then uses the Gumbel-max trick to sample a query from the filtered candidates according to the exponential mechanism distribution. The method returns the selected query, its embedding, and diagnostic information about the probabilities and utilities of the candidates.
 
-    Returns:
-        Tuple[str,torch.Tensor,np.ndarray,np.ndarray]: A tuple containing the selected query, its embedding, the true EM probabilities, and the utilities.
+        :param e: the input embedding of the text to obfuscate, shape (d,).
+        :type e: torch.Tensor
+        :param epsilon: the privacy budget to use for the exponential mechanism. This value determines the level of privacy provided by the selection of the query, with smaller values providing stronger privacy guarantees but potentially lower utility of the selected query.
+        :type epsilon: float
+        :param seed: an optional random seed for reproducibility. This seed will be used in the Gumbel-max trick to ensure that the selection of the query from the filtered candidates is reproducible across runs with the same input and parameters. If None, the selection will be non-deterministic.
+        :type seed: Optional[int]
+        
+        :return: a tuple containing the selected query, its embedding, the probabilities of the candidates, and their utilities. The selected query is the one chosen by the exponential mechanism based on the input embedding and the specified epsilon, and its embedding is the corresponding embedding from the pool. The probabilities and utilities provide diagnostic information about the candidates that were considered in the selection process.
+        :rtype: Tuple[str, torch.Tensor, np.ndarray, np.ndarray]
+        """
+        if not (0.0 < self.top_percentile <= 1.0):
+            raise ValueError(f"top_percentile must be in (0, 1], got {self.top_percentile}")
+        if seed is not None:
+            np.random.seed(seed)
+        else:
+            np.random.seed()
 
-        selected_query: the string query selected by the exponential mechanism from the query pool. It is the pin from which the reconstruction will be performed.
-        selected_embedding: the embedding of the selected query, shape (d,).
-        probs: the true probabilities of selection for each candidate in the filtered pool, shape (K_filtered,). K_filtered is the number of candidates that passed the percentile filter. These probabilities are not used for sampling (the Gumbel-max trick is used instead), but are returned for diagnostics.
-        utilities: the utility values (cosine similarities) for each candidate in the filtered pool, shape (K_filtered,). These are the values used in the exponential mechanism to determine selection probabilities.
-    """
-    #sanity checks on percentiles and utility function
-    if not (0.0 < top_percentile <= 1.0):
-        raise ValueError(f"top_percentile must be in (0, 1], got {top_percentile}") #TODO: add this check to the obfuscator init as well
-    if seed is not None:
-        np.random.seed(seed) #TODO: Set it also in the init
-    if utility_function not in ["cosine_similarity", "rbf", "correlation"]:
-        raise ValueError(f"Unsupported utility function: {utility_function}. Supported functions are: 'cosine_similarity', 'rbf', 'correlation'.")
-    if utility_function == "cosine_similarity":
-        delta_u = 2.0 # L2 sensitivity of cosine similarity with normalized embeddings (max change in cosine similarity when one point changes is 2, cosine similarity ranges from -1 to 1, and changing one point can flip the similarity from 1 to -1 or vice versa)
-    elif utility_function == "rbf":
-        delta_u = 1.0 # L2 sensitivity of RBF kernel with normalized embeddings and gamma=1 (max change in RBF similarity when one point changes is 1, RBF similarity ranges from 0 to 1, and changing one point can flip the similarity from 1 to 0 or vice versa) -- NOTE: this is a very loose upper bound, the actual sensitivity of the RBF kernel can be much smaller depending on the gamma parameter and the distribution of the embeddings, but using a smaller delta_u would require a more complex analysis and we prefer to use a conservative upper bound for simplicity.
-    elif utility_function == "correlation":
-        delta_u = 2.0 # L2 sensitivity of correlation with normalized embeddings (max change in correlation when one point changes is 2, correlation ranges from -1 to 1, and changing one point can flip the correlation from 1 to -1 or vice versa)
+        e_cpu = (e / e.norm()).cpu()
+        N = len(self.queries)
 
-    e_cpu = (e / e.norm()).cpu()
-    N = len(pool_queries)
+        # Compute utilities in chunks to bound peak RAM
+        chunk = 50_000
+        all_utils = np.empty(N, dtype=np.float32)
+        for start in range(0, N, chunk):
+            end = min(start + chunk, N)
+            all_utils[start:end] = (self.embeddings[start:end] @ e_cpu).numpy()
 
-    # Compute utilities in chunks to bound peak RAM
-    chunk = 50_000
-    all_utils = np.empty(N, dtype=np.float32)
-    for start in range(0, N, chunk):
-        end = min(start + chunk, N)
-        all_utils[start:end] = (pool_embs[start:end] @ e_cpu).numpy()
+        # Percentile filter
+        cutoff = float(np.percentile(all_utils, 100.0 * (1.0 - self.top_percentile)))
+        mask = all_utils >= cutoff
 
-    # Percentile filter
-    cutoff = float(np.percentile(all_utils, 100.0 * (1.0 - top_percentile)))
-    mask = all_utils >= cutoff
+        # Get indices of candidates that passed the filter
+        filtered_idx = np.where(mask)[0]
+        utilities = all_utils[filtered_idx]
+        K = len(filtered_idx)
+        self.log.info(f"Using top_percentile {self.top_percentile:.2f}, meaning {K:,}/{N:,} candidates.")
+        self.log.info(f"(u in [{utilities.min():.4f}, {utilities.max():.4f}])")
 
-    # Get indices of candidates that passed the filter
-    filtered_idx = np.where(mask)[0]
-    utilities = all_utils[filtered_idx]
-    K = len(filtered_idx)
-    log.info(
-        f"[Exp. Mech.] t = {top_percentile:.2f} => {K:,}/{N:,} candidates "
-        f"(u in [{utilities.min():.4f}, {utilities.max():.4f}])"
-    )
+        # Gumbel-max trick (equivalent to sampling from Exp Mech distribution)
+        # ref. https://differentialprivacy.org/one-shot-top-k/
+        gumbel_scale = (2.0 * self.global_sensitivity) / epsilon
+        noisy = utilities + np.random.gumbel(0.0, gumbel_scale, size=K)
+        local_best = int(np.argmax(noisy))
+        global_best = int(filtered_idx[local_best])
 
-    # Gumbel-max trick (equivalent to sampling from Exp Mech distribution) ref. https://differentialprivacy.org/one-shot-top-k/#:~:text=Gumbel%20Noise%20and%20the%20Exponential,%CE%B2%20)%20=%201%20%CE%B2%20exp%20%E2%81%A1
-    gumbel_scale = (2.0 * delta_u) / epsilon
-    noisy = utilities + np.random.gumbel(0.0, gumbel_scale, size=K)
-    local_best = int(np.argmax(noisy))
-    global_best = int(filtered_idx[local_best])
+        # True Exp Mech probabilities for diagnostics (not used in sampling)
+        log_w = (epsilon / (2.0 * self.global_sensitivity)) * utilities
+        log_w -= log_w.max()
+        probs = np.exp(log_w); probs /= probs.sum()
 
-    # True Exp Mech probabilities for diagnostics (not used in sampling)
-    log_w = (epsilon / (2.0 * delta_u)) * utilities
-    log_w -= log_w.max()
-    probs = np.exp(log_w); probs /= probs.sum()
-
-    return pool_queries[global_best], pool_embs[global_best], probs, utilities
-
-@staticmethod
-def generate_from_embedding(
-    target_emb: torch.Tensor,
-    corrector: vec2text.trainers.Corrector,
-    **kwargs) -> str:
-    """
-    Generate a text from the target embedding using the corrector model.
-
-    Args:
-        target_emb (torch.Tensor): the target embedding from which to generate the text, shape (d,).
-        corrector (vec2text.trainers.Corrector): the vec2text corrector model to use for generation.
-        kwargs: additional keyword arguments, such as num_corrector_steps, which determines how many steps of the corrector to run for generation. By default, it is set to 1, which means that the corrector will be applied once to the target embedding to generate the output text. Increasing this number may lead to better reconstruction quality but also increases the computational cost and weakens privacy.
-
-    Returns:
-        str: the generated text from the target embedding.
-    """
-    device = next(corrector.model.parameters()).device
-    with torch.no_grad():
-        texts = vec2text.invert_embeddings(
-            embeddings=target_emb.unsqueeze(0).to(device),
-            corrector=corrector,
-            num_steps=kwargs.get("num_corrector_steps", 1),
-        )
-    return texts[0].strip()
+        return self.queries[global_best], self.embeddings[global_best], probs, utilities
