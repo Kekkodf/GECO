@@ -1,3 +1,4 @@
+import numpy as np
 from tabulate import tabulate
 
 from geco.src import AbstractGECO
@@ -45,6 +46,7 @@ class CorrelationGECO(AbstractGECO.Obfuscator):
         
         super().__init__(**kwargs)
         self.utility_function = 'correlation'
+        self._utility_fn = self._compute_utility
         self.global_sensitivity = 2.0
         self.log.info(f"CorrelationGECO Obfuscator initialized with utility function: {self.utility_function} and global sensitivity: {self.global_sensitivity}.")
 
@@ -77,4 +79,28 @@ class CorrelationGECO(AbstractGECO.Obfuscator):
         ])
 
     def _compute_utility(self, query_embedding, pool_embeddings):
-        ...
+        """Pearson correlation between query_embedding and each of the pool_embeddings. The correlation is computed as the cosine similarity between the mean-centered query_embedding and the mean-centered pool_embeddings. The mean-centering is done by subtracting the mean of the embeddings from each embedding, which ensures that the correlation is not affected by the magnitude of the embeddings but only by their direction and relative position in the embedding space (Remark: Should be already normalised). The global sensitivity for the correlation utility function is 2.0, which means that changing one query in the pool can change the utility by at most 2.0.
+
+        :param query_embedding: the embedding of the input text for which we want to compute the utility of the pool queries. This should be a 1D numpy array or PyTorch tensor of the same dimension as the pool embeddings.
+        :type query_embedding: np.ndarray or torch.Tensor
+        :param pool_embeddings: the embeddings of the queries in the pool. This should be a 2D numpy array or PyTorch tensor of shape (n_pool, embedding_dim), where n_pool is the number of queries in the pool and embedding_dim is the dimension of the embeddings.
+        :type pool_embeddings: np.ndarray or torch.Tensor
+
+        :return: the utility of each query in the pool with respect to the input query embedding, computed as the correlation. This should be a 1D numpy array or PyTorch tensor of shape (n_pool,).
+        :rtype: np.ndarray or torch.Tensor
+        """
+
+        b_centered = query_embedding - query_embedding.mean()
+        b_norm = np.linalg.norm(b_centered)
+        if b_norm == 0:
+            self.log.warning("Query embedding has zero variance, returning zero utility for all pool queries.")
+            raise RuntimeError("Query embedding has zero variance, cannot compute correlation utility.")
+        a_centered = pool_embeddings - pool_embeddings.mean(axis=1, keepdims=True)
+        a_norms = np.linalg.norm(a_centered, axis=1)
+        # Avoid division by zero in case of zero variance in pool embeddings
+        zero_variance_mask = a_norms == 0
+        if np.any(zero_variance_mask):
+            self.log.warning(f"{np.sum(zero_variance_mask)} pool embeddings have zero variance, setting their utility to zero.")
+            raise RuntimeError(f"{np.sum(zero_variance_mask)} pool embeddings have zero variance, cannot compute correlation utility.")
+        utilities = (a_centered @ b_centered) / (a_norms * b_norm)
+        return utilities

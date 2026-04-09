@@ -1,3 +1,4 @@
+import numpy as np
 from tabulate import tabulate
 
 from geco.src import AbstractGECO
@@ -42,6 +43,7 @@ class KernelDensityGECO(AbstractGECO.Obfuscator):
         
         super().__init__(**kwargs)
         self.utility_function = 'RBF Kernel'
+        self._utility_fn = self._compute_utility
         self.global_sensitivity = 1.0
         self.gamma = 1.0  # Hyperparameter for RBF kernel
         self.log.info(f"Gamma for RBF kernel in KernelDensityGECO: {self.gamma}")
@@ -77,4 +79,21 @@ class KernelDensityGECO(AbstractGECO.Obfuscator):
 
     
     def _compute_utility(self, query_embedding, pool_embeddings):
-        ...
+        """Compute the utility of each query in the pool based on the RBF kernel similarity with the input query embedding.
+        
+        The RBF kernel similarity is computed as exp(-gamma * ||x - y||^2), where gamma is a hyperparameter that controls the width of the kernel. A higher gamma value will make the kernel more sensitive to small differences between embeddings, while a lower gamma value will make it more tolerant to differences.
+
+        :param query_embedding: the embedding of the input query for which we want to compute the utility against the pool embeddings.
+        :type query_embedding: torch.Tensor
+        :param pool_embeddings: the embeddings of the queries in the pool against which we want to compute the utility of the input query embedding.
+        :type pool_embeddings: np.ndarray
+
+        :return: an array of utility values corresponding to each query in the pool, where the utility is computed based on the RBF kernel similarity between the input query embedding and each pool embedding.
+        :rtype: np.ndarray
+
+        """
+        # Compute squared Euclidean distance
+        dists = np.linalg.norm(pool_embeddings - query_embedding.cpu().numpy(), axis=1) ** 2
+        # Compute RBF kernel similarity
+        utilities = np.exp(-self.gamma * dists)
+        return utilities

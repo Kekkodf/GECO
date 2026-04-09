@@ -28,10 +28,10 @@ class Obfuscator:
 
     def __init__(self,
         log: logging.Logger,
-        st_model_name: str,
-        inversion_model_name: str,
-        corrector_model_name: str,
-        cache_path_pins: str,
+        st_model_name: str = "sentence-transformers/gtr-t5-base",
+        inversion_model_name: str = "ielabgroup/vec2text_gtr-base-st_inversion",
+        corrector_model_name: str = "ielabgroup/vec2text_gtr-base-st_corrector",
+        cache_path_pins: str = "./data/query_pool/msmarco_gtr_embeddings.pt",
         collection_name: str = "msmarco-passage/train",
         epsilons: List[float] = [1.0, 5.0, 10.0, 12.5, 15.0, 17.5, 20.0, 30.0, 50.0],
         **kwargs) -> None:
@@ -63,11 +63,8 @@ class Obfuscator:
             log = geco.utils.createLogger("GECO_Obfuscator_Logger")
         self.log = log
 
-        assert st_model_name is not None, "st_model_name cannot be None"
         self.st_model_name = st_model_name
-        assert corrector_model_name is not None, "corrector_model_name cannot be None"
         self.corrector_model_name = corrector_model_name
-        assert inversion_model_name is not None, "inversion_model_name cannot be None"
         self.inversion_model_name = inversion_model_name
         self._load_models()
         
@@ -310,7 +307,7 @@ class Obfuscator:
         if not check:
             self.log.error("Utility function and global sensitivity must be defined for the obfuscation to work. Please use a specific implementation of GECO with a defined utility function and global sensitivity (e.g. CosineGECO, KernelDensityGECO, CorrelationGECO) for actual obfuscation.")
             raise ValueError("Utility function and global sensitivity must be defined for the obfuscation to work. Please use a specific implementation of GECO with a defined utility function and global sensitivity (e.g. CosineGECO, KernelDensityGECO, CorrelationGECO) for actual obfuscation.")
-        selected_query, selected_emb, probs, utilities = self.exponential_mechanism(e, epsilon, seed=seed) # TODO: check logic of the return values of exponential_mechanism
+        selected_query, selected_emb, probs, utilities = self.exponential_mechanism(e, epsilon, seed=seed) 
 
         # Generation of the output text
         self.log.info(f"Pin query selected by the exponential mechanism: '{selected_query}'")
@@ -397,25 +394,24 @@ class Obfuscator:
         else:
             np.random.seed()
 
+        if not hasattr(self, "_utility_fn") or self._utility_fn is None:
+            raise RuntimeError("self._utility_fn is not set.")
+
         e_cpu = (e / e.norm()).cpu()
-        N = len(self.queries)
 
         # Compute utilities in chunks to bound peak RAM
         chunk = 50_000
-        all_utils = np.empty(N, dtype=np.float32)
-        for start in range(0, N, chunk):
-            end = min(start + chunk, N)
-            all_utils[start:end] = (self.embeddings[start:end] @ e_cpu).numpy()
+        all_utils = np.empty(self.n_pool, dtype=np.float32)
+        for start in range(0, self.n_pool, chunk):
+            end = min(start + chunk, self.n_pool)
+            all_utils[start:end] = self._utility_fn(e_cpu, self.embeddings[start:end])
 
         # Percentile filter
         cutoff = float(np.percentile(all_utils, 100.0 * (1.0 - self.top_percentile)))
-        mask = all_utils >= cutoff
-
-        # Get indices of candidates that passed the filter
-        filtered_idx = np.where(mask)[0]
+        filtered_idx = np.where(all_utils >= cutoff)[0]
         utilities = all_utils[filtered_idx]
         K = len(filtered_idx)
-        self.log.info(f"Using top_percentile {self.top_percentile:.3f}, meaning {K:,}/{N:,} candidates.")
+        self.log.info(f"Using top_percentile {self.top_percentile:.3f}, meaning {K:,}/{self.n_pool:,} candidates.")
         self.log.info(f"(u in [{utilities.min():.3f}, {utilities.max():.3f}])")
 
         # Gumbel-max trick (equivalent to sampling from Exp Mech distribution)

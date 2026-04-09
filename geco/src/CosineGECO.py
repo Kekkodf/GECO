@@ -1,3 +1,4 @@
+import numpy as np
 from tabulate import tabulate
 
 from geco.src import AbstractGECO
@@ -42,6 +43,7 @@ class CosineGECO(AbstractGECO.Obfuscator):
         
         super().__init__(**kwargs)
         self.utility_function = 'cosine'
+        self._utility_fn = self._compute_utility
         self.global_sensitivity = 2.0
         self.log.info(f"CosineGECO Obfuscator initialized with utility function: {self.utility_function} and global sensitivity: {self.global_sensitivity}.")
 
@@ -74,4 +76,17 @@ class CosineGECO(AbstractGECO.Obfuscator):
         ])
     
     def _compute_utility(self, query_embedding, pool_embeddings):
-        ...
+        """Compute the utility of each query in the pool based on cosine similarity with the input query embedding.
+
+        This method computes the cosine similarity between the input query embedding and each of the pool embeddings, which serves as the utility function for the exponential mechanism. The cosine similarity is computed as the dot product of the normalized embeddings, which is equivalent to the cosine of the angle between them in the embedding space.
+
+        :param query_embedding: the embedding of the input query for which we want to compute the utility against the pool embeddings. This should be a 1D tensor of shape (embedding_dim,).
+        :type query_embedding: torch.Tensor
+        :param pool_embeddings: a matrix of embeddings for the queries in the pool, where each row corresponds to a query embedding.
+        :type pool_embeddings: torch.Tensor
+
+        :return: an array of utility values corresponding to each query in the pool, where higher values indicate greater similarity to the input query embedding.
+        :rtype: np.ndarray
+        """
+        utilities = (pool_embeddings @ query_embedding.cpu()).numpy().astype(np.float32)
+        return utilities
