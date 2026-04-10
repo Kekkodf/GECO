@@ -1,4 +1,5 @@
 import numpy as np
+import torch
 from tabulate import tabulate
 
 from geco.src import AbstractGECO
@@ -78,7 +79,7 @@ class CorrelationGECO(AbstractGECO.Obfuscator):
             model_section
         ])
 
-    def _compute_utility(self, query_embedding, pool_embeddings):
+    def _compute_utility(self, query_embedding, pool_embeddings) -> torch.Tensor:
         """Pearson correlation between query_embedding and each of the pool_embeddings. The correlation is computed as the cosine similarity between the mean-centered query_embedding and the mean-centered pool_embeddings. The mean-centering is done by subtracting the mean of the embeddings from each embedding, which ensures that the correlation is not affected by the magnitude of the embeddings but only by their direction and relative position in the embedding space (Remark: Should be already normalised). The global sensitivity for the correlation utility function is 2.0, which means that changing one query in the pool can change the utility by at most 2.0.
 
         :param query_embedding: the embedding of the input text for which we want to compute the utility of the pool queries. This should be a 1D numpy array or PyTorch tensor of the same dimension as the pool embeddings.
