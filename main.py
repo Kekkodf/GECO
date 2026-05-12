@@ -21,16 +21,11 @@ DEMO_TEXTS = [
 def main():
     log = createLogger('main')
     
-    geco_obfuscator= ExponentialGECO(
-        log=log
+    geco_obfuscator= KernelDensityGECO(
+        log=log, strategy="internal"
     )
     print(geco_obfuscator)
     
-    
-    #print("\n" + "=" * 76)
-    #for text in DEMO_TEXTS:
-    #  for eps in geco_obfuscator.epsilons:
-    #    print(geco_obfuscator.obfuscate(text, epsilon=eps))
 
     print("\n" + "=" * 76)
     for text in DEMO_TEXTS:

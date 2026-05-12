@@ -109,7 +109,7 @@ class ExponentialGECO(AbstractGECO.Obfuscator):
             )
         for i in range(len(candidates)):
             print(f"Step {i+1} candidates: {candidates[i]}")
-            exit()
-        return output_string[0]
-        #
+            print(f"Step {i+1} output string: {output_string[i]}")
         exit()
+        return output_string[0]
+    
