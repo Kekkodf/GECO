@@ -2,6 +2,7 @@ import argparse
 import os
 import pandas as pd
 import ir_datasets
+import tqdm
 
 from geco.utils import createLogger
 from geco.src.AbstractGECO import Obfuscator
@@ -10,7 +11,7 @@ from geco.src.CosineGECO import CosineGECO
 from geco.src.RbfGECO import KernelDensityGECO
 
 collections = [
-    "msmarco-passage/trec-dl-2019/judged",
+    #"msmarco-passage/trec-dl-2019/judged",
     "msmarco-passage/trec-dl-2020/judged",
     "disks45/nocr/trec-robust-2004",
     "medline/2004/trec-genomics-2004",
@@ -35,9 +36,9 @@ def main():
 
     # Map a friendly name -> obfuscator class so we can build them in a loop
     geco_classes = {
-        "CosineGECO": CosineGECO,
         "KernelDensityGECO": KernelDensityGECO,
         "CorrelationGECO": CorrelationGECO,
+        "CosineGECO": CosineGECO,
     }
 
     for col in collections:
@@ -86,7 +87,7 @@ def main():
 
                 os.makedirs(OUTPUT_DIR+f'/{geco_name}/{col2name[col]}', exist_ok=True)
                 out_path = os.path.join(
-                    OUTPUT_DIR,
+                    OUTPUT_DIR+f'/{geco_name}/{col2name[col]}',
                     f"obfuscatedText_{geco_name}_{epsilon}.csv",
                 )
                 out_df.to_csv(out_path, index=False)
