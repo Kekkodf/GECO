@@ -12,8 +12,8 @@ from geco.src.RbfGECO import KernelDensityGECO
 
 collections = [
     #"msmarco-passage/trec-dl-2019/judged",
-    "msmarco-passage/trec-dl-2020/judged",
-    "disks45/nocr/trec-robust-2004",
+    #"msmarco-passage/trec-dl-2020/judged",
+    #"disks45/nocr/trec-robust-2004",
     "medline/2004/trec-genomics-2004",
 ]
 
